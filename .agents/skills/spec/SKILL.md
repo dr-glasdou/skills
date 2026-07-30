@@ -1,63 +1,67 @@
 ---
 name: spec
-description: Designs and develops specs following the spec-driven method. Asks clarifying questions before proposing structure, and builds the spec section by section. Use ONLY when the user explicitly invokes `/spec` to start a large feature, before writing code. Do not trigger on its own.
+description: Designs and develops specs following the spec-driven method. Asks clarifying questions before proposing structure, and builds the spec section by section. Use it when starting a large feature, before writing code.
+disable-model-invocation: true
+argument-hint: 'short feature description or requirement'
+allowed-tools: Bash(git branch:*), Bash(ls:*)
 ---
 
 # /spec — Guided spec designer
 
-Help the user clarify what they want to build and develop the spec section by section until it is ready to save into `specs/`. **You don't write code here.** A spec is the contract that drives later execution: vague spec → improvised code. This flow is deliberately slow during definition and fast during writing.
+You design a spec here; **you never write code.** Clarify what the user wants, ask when something is underspecified, and build the spec section by section until it's ready to save into `specs/`.
 
-Read `template.md` (same directory as this skill) for the full structure the spec follows. Lean on it at every step.
+A spec is the contract that drives execution. Vague spec → improvised code. So this flow is deliberately slow while defining and fast while writing.
 
-Reply in the same language as the initial prompt. Follow the four phases in order — **do not skip phases**. If the user wants to go faster, remind them the cost of a bad spec gets paid later in code.
+Read `template.md` (same directory) for the exact structure, including the `<!-- section:xxx -->` anchor comments — they're what lets `/spec-impl` parse sections regardless of language. Never omit them.
 
-### Phase 1 — Understand the context
+Reply in the same language as the initial prompt. The anchor comments stay in English — they're machine markers.
 
-1. Read the project-memory file, first hit wins: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `README.md`.
+## Phase 1 — Context
+
+1. Read the first project-memory file that exists, in order: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `README.md`.
 2. List `specs/` to see existing specs and numbering.
-3. If previous specs exist, read the two most recent to pick up conventions.
+3. If specs exist, read the two most recent for conventions.
 
-If `$ARGUMENTS` is empty, ask for a **single-sentence** description of the feature. If it doesn't fit in one sentence, that's the first signal it's too big — suggest splitting before continuing.
+If `$ARGUMENTS` is empty, ask for a **one-sentence** description. If it can't fit in one sentence, the feature is too big — suggest splitting.
 
-### Phase 2 — Clarify through questions
+## Phase 2 — Clarify through questions
 
-The most important phase. **Detect ambiguities and ask — never assume.** Ask in blocks of 3–5 questions (not one at a time), then wait for answers.
+Detect ambiguities and ask; don't assume. Ask in blocks of 3–5 (never one at a time), and wait for answers between blocks.
 
-**Categories to always consider:** scope (in / out / deferred), data (new structures, names, location), integration (dependencies on prior specs, modifies vs. adds), persistence (what, where, versioning), UX and states (success, failure, intermediate), risks (what breaks it, degraded case), closed decisions (already made, not to reopen).
+Always consider: **scope** (in vs. explicitly not), **data** (new structures, names, location), **integration** (depends on / modifies existing?), **persistence** (saved where, versioned how?), **UX/states** (success, failure, intermediate), **risks** (what breaks it, degraded case), **closed decisions** (already made, don't reopen).
 
-**Phrasing:**
+Phrasing:
+- Concrete, not open. ❌ "How do you imagine persistence?" → ✅ "localStorage, IndexedDB, or a JSON file?"
+- Offer 2–4 options, mark your recommendation and why.
+- If an answer opens Pandora's box (e.g. "also multiplayer"), flag it as its own spec and ask to defer it.
 
-- Concrete, not open-ended. ❌ "How do you imagine persistence?" → ✅ "localStorage, IndexedDB, or a JSON file on disk?"
-- When offering options, give 2–4 and mark your recommendation with a reason.
-- If an answer opens Pandora's box (e.g. "and also multiplayer"), point out it deserves its own spec and ask whether to leave it out of scope.
+Stop asking once you can answer, with no assumptions: (1) which files appear or change, (2) first and last executable step, (3) how to verify it's done. If you can't answer one, keep asking.
 
-**Stop asking** when you can answer these three without assuming: (1) which files will appear or change, (2) what is the first executable step and the last, (3) how to verify the feature is finished. Otherwise, keep asking.
+## Phase 3 — Build section by section
 
-### Phase 3 — Develop the spec section by section
+Never generate the full spec at once. Develop each section, show it, wait for confirmation, then move on. After each: show it in markdown, ask "Does this stay or do you want to tweak it?", apply changes and re-show until confirmed.
 
-**Never generate the full spec in one shot.** Develop the template's sections one by one, in this strict order, showing each and waiting for confirmation before the next:
+Order:
+1. **Header** — state, dependencies, date, one-sentence objective. `Status:` must be the **first line** of the blockquote (positional anchor `/spec-impl` relies on). If the objective needs two sentences, return to Phase 2.
+2. **Scope** — in *and* explicitly not-in.
+3. **Data model** — real names. If no new data, say so explicitly and skip.
+4. **Implementation plan** — numbered steps, each leaving the system runnable.
+5. **Acceptance criteria** — boolean checklist, not aspirational.
+6. **Decisions taken and discarded** — with brief reasons.
+7. **Risks** — only if non-obvious; else skip.
 
-1. **Header** (state, dependencies, date, one-sentence objective — if it doesn't fit in one sentence, back to Phase 2).
-2. **Scope** (in AND explicit not-in).
-3. **Data model** (concrete structures, real names; if no new data, skip and say so explicitly).
-4. **Implementation plan** (numbered steps, each leaving the system functional).
-5. **Acceptance criteria** (boolean checklist, not aspirational).
-6. **Decisions taken and discarded** (with brief justification).
-7. **Identified risks** (only if applicable).
+Sections 2–7 each open with their `<!-- section:xxx -->` anchor right after the `##` heading.
 
-After each section: show it in markdown, ask "Does this section stay like this or do you want to tweak it?", apply requested changes, and only advance once confirmed.
+Avoid: unverifiable criteria ("works well"), plan items outside scope, unconfirmed file names, skipping decisions, missing anchors.
 
-**Avoid:** non-verifiable criteria ("that it works well"), plan items outside the scope, assuming unconfirmed file names or structures, skipping the decisions section (the one with the most long-term value).
+## Phase 4 — Save
 
-### Phase 4 — Save the spec
-
-When all sections are confirmed:
-
-1. Next sequential number from `specs/` (last is `02-powerups.md` → this one is `03-`).
-2. Short slug from the objective (e.g. `levels-and-highscores`).
-3. Confirm the proposed file name with the user before writing.
-4. Create `specs/NN-slug.md` with all approved sections, state `Draft`. **Never mark `Approved` automatically** — the user does that after re-reading.
-5. **Seed the config if missing.** If `specs/.spec-config.yml` does not exist, create it with the content below. If it exists, **leave it untouched**.
+1. **Next number = max(highest `NN` in `specs/*.md`, highest `NN` in `git branch -a` matching `spec-NN-*`) + 1.** Checking branches avoids collisions across parallel work. If the two sources disagree, tell the user in one line before proceeding.
+2. Slug from the objective (e.g. `levels-and-highscores`).
+3. Confirm the file name with the user before writing.
+4. Write `specs/NN-slug.md` with all approved sections and anchors.
+5. State = `Draft`. **Never auto-set `Approved`** — the user does that after re-reading.
+6. If `specs/.spec-config.yml` is **missing**, create it below. If it **exists, leave it untouched.**
 
    ```yaml
    # spec workflow configuration
@@ -68,29 +72,26 @@ When all sections are confirmed:
    AutoCreateBranch: true
    ```
 
-6. Confirm: path of the created file; reminder it's in `Draft` — change to `Approved` after re-reading; if you just created the config, mention it and its default; next step is `/spec-impl NN-slug`. **Stop here** — do not propose implementing or any further action.
+7. Confirm: file path; reminder it's `Draft` (change to `Approved` after re-reading); if you just created the config, note `AutoCreateBranch` defaults to `true`; next step is `/spec-impl NN-slug`. **Then stop** — don't propose implementing or writing code.
 
 ## Hard rules
 
-- **Never write code.** Only the spec's `.md` file at the end.
-- **Never propose implementing after saving.** Your job ends when the file is written.
-- **Never assume unconfirmed decisions.** Missing info → ask.
-- **Never generate the full spec in a single response.**
-- **If the user wants to skip Phase 2**, remind them: "Questions now save hours later. Are you sure?". If they insist, respect it but record it in the decisions section ("Quick definition without detailed clarification").
-- **If the feature is too big** (doesn't fit in one sentence, touches 3+ areas, needs decisions in 4+ domains), propose splitting into multiple specs before continuing.
+- Never write code here — only the `.md` at the end.
+- Never propose implementing after saving. Your job ends at the written file.
+- Never assume unconfirmed decisions — ask.
+- Never generate the full spec in one response.
+- If the user wants to skip Phase 2: "Questions now save hours later. Are you sure?" If they insist, respect it but record it under Decisions ("Quick definition without detailed clarification").
+- If the feature is too big (won't fit one sentence, touches >3 system areas, or needs decisions in ≥4 domains), propose splitting before continuing.
 
-## Tone when asking
+## Tone
 
-Direct and specific. Never apologize for asking or hedge ("if you don't mind..."). Number the questions so they're easy to answer. Example:
+Direct and specific. Don't apologize for asking; no "if you don't mind..." The user invoked this to be asked. Number questions when there are several. Example:
 
-> Before writing the data model I need to clarify three things:
->
-> 1. **Persistence.** localStorage, IndexedDB, or a JSON file on disk? Recommendation: localStorage if the data fits in <5MB and needs no queries.
-> 2. **Schema versioning.** When the format changes: (a) version prefix in the key, (b) ignore and rebuild, (c) migrate on load?
-> 3. **Privacy.** Is the data sensitive? If yes, encrypted? Deleted on logout?
+> Before the data model I need three things:
+> 1. **Persistence.** localStorage, IndexedDB, or JSON on disk? Rec: localStorage if <5MB and no queries.
+> 2. **Schema versioning.** On format change: (a) version prefix in key, (b) rebuild, (c) migrate on load?
+> 3. **Privacy.** Sensitive? Encrypted? Deleted on logout?
 
 ## Arguments
 
-- `/spec levels-and-highscores` → use `${ARGUMENTS}` (`levels-and-highscores`) as the initial slug suggestion, but confirm before writing the file.
-- `/spec` with no arguments → `${ARGUMENTS}` is empty; start by asking for the one-sentence description.
-- Argument matches an existing file in `specs/` (number, slug, or full name) → **resume mode**: read that spec, show its current sections, and continue from the first incomplete or unconfirmed section using the Phase 3 flow. Do not renumber or create a new file.
+`/spec levels-and-highscores` → use `levels-and-highscores` as the initial slug suggestion (confirm before writing). `/spec` alone → ask for the one-sentence description.

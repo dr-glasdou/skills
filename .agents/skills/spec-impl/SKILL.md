@@ -145,11 +145,13 @@ Wait for explicit confirmation ("yes", "go", or equivalent). Then:
 
 **Above all:** implement what the spec says. If something looks suboptimal, note it as an observation but implement what was agreed. Spec changes go in the spec, not silently into code.
 
-**Work rhythm per step:**
-1. Implement the step.
-2. Summarize which files you touched and what you did, plus `git diff --stat`.
-3. Say: `Step N done — review the diff. Reply "continue" to commit it and start Step N+1, or tell me what to change.`
-4. **Wait.** On "continue" / "ok" / "go" / approval: this approves AND commits — never skip the commit. `git add` the touched files and commit with conventional commit `e.g.: feat(spec-NN): step N — short description`, THEN start the next step. Only skip the commit if the user explicitly says not to (e.g. "don't commit").
+**Rhythm per step:**
+1. Implement the step's code.
+2. Summarize files touched and what changed. Say: `Step N implemented. Review the diff — approve and I'll mark it done and commit.`
+3. **Wait for explicit approval.** Do not tick or commit before it.
+4. On approval: tick the step's checkbox in `specs/NN-slug.md` (`- [ ]` → `- [x]`).
+5. Commit the code **and** the ticked spec together, with `Step N` in the message (e.g. `feat(spec-nn): Step 3 - wire scoring to collision events`).
+6. Say `Step N done and committed. Continue with Step N+1?` and wait.
 
 **On unresolved ambiguity:** stop, describe it exactly, offer 2–3 concrete options, wait. Don't improvise.
 

@@ -1,45 +1,53 @@
 ---
 name: spec-impl
-description: Implements an approved spec. Validates the state means "Approved" (any language), creates and switches to a branch named after the spec, then implements step by step with pauses to review diffs. Use ONLY when the user explicitly invokes `/spec-impl`. Do not trigger on its own.
+description: Implements an approved spec. Validates that the state means "Approved" (in any language), creates a git branch named after the spec, switches to it, and starts the implementation step by step with pauses to review diffs.
+disable-model-invocation: true
+argument-hint: <NN-spec-name>
+allowed-tools: Bash(git status:*), Bash(git branch:*), Bash(git checkout:*), Bash(git log:*), Bash(cat:*), Bash(ls:*)
 ---
 
 # /spec-impl — Implementer of approved specs
 
 ## Session context
 
-Read this context first, using the available tools:
+Repository state:
+!`git status --short`
 
-1. `git status --short` — repository state.
-2. `git branch --show-current` — current branch.
-3. `ls specs/ 2>/dev/null || echo "The specs/ folder does not exist"` — available specs.
-4. `cat specs/.spec-config.yml 2>/dev/null || echo "AutoCreateBranch: true (default, no config file)"` — branch-creation config.
+Current branch:
+!`git branch --show-current`
 
-Report the four results at the top of your reply so the user can see them, then continue.
+Spec branches (local + remote):
+!`git branch -a --list "*spec-*"`
+
+Specs available:
+!`ls specs/ 2>/dev/null || echo "The specs/ folder does not exist"`
+
+Branch-creation config:
+!`cat specs/.spec-config.yml 2>/dev/null || echo "AutoCreateBranch: true (default, no config file)"`
 
 ---
 
-## Instructions
+Follow the phases in strict order. Do not advance if the previous phase didn't complete correctly.
 
-Reply in the same language as the spec's content (or the user's messages if they differ).
+## Phase 1 — Identify the spec
 
-Follow the four phases in strict order. **Never advance if the previous phase did not complete correctly.**
+Argument: `$ARGUMENTS`
 
-### Phase 1 — Identify the spec
+If empty: list `specs/`, ask for the exact name, stop and wait.
 
-Argument received: `${ARGUMENTS}`
+If set: find the file in `specs/` — the user may give the full name (`01-mvp-arkanoid`), just the number (`01`), or just the slug (`mvp-arkanoid`). If not found, show available specs and ask for a correction. If found, continue.
 
-- If empty: list the specs above, ask the user for the exact name, and stop.
-- If present: find the matching file in `specs/` — accept full name (`01-mvp-arkanoid`), number only (`01`), or slug only (`mvp-arkanoid`). If no match, show the available specs and ask the user to correct it.
+## Phase 2 — Validate state
 
-### Phase 2 — Validate the spec's state
+Read the spec file (`cat` or Read tool).
 
-Read the spec file. Find its status line in the header blockquote near the top (per the spec template, format `> **Status:** Value` — label is usually `Status` / `Estado`, but may be in any language; match by position and meaning, not exact wording).
+**Parse the state positionally:** the header blockquote's **first line** is always the `Status`/`Estado`/equivalent line (enforced by `template.md`). Take the value after the colon on that line — don't search the rest of the file, don't infer from wording elsewhere.
 
-**Absolute rule:** continue only if the state **means "Approved"** in any language (`Approved`, `Aprobado`, `Aprovado`, `Approuvé`, `Genehmigt`, `Approvato`, …). Anything else — Draft, In review, Implemented, Obsolete, an unrecognized value, or no status line at all — means **stop** and show the error message below. If the status line is missing, also tell the user the file does not follow the expected format. If unsure whether a value means "approved", **do not assume** — ask the user to clarify or update the spec to canonical wording.
+**You may only continue if the state means "Approved"**, in any language: `Approved`, `Aprobado`, `Aprovado`, `Approuvé`, `Genehmigt`, `Approvato`, or any other word clearly meaning approved. Anything else — Draft, In review, Implemented, Obsolete, unrecognized, or state line not found — **stops** with the error below.
 
-**Dependency check:** if the header blockquote lists dependencies (`> **Depends on:**` / `> **Depende de:**` / equivalent), read each referenced spec and verify its state means "Implemented". If any is pending, list them and require explicit confirmation before continuing.
+If unsure whether a value means approved, do not assume — stop and ask the user to clarify or update the spec.
 
-**Standard error message when the state is not Approved:**
+**Error message (state not Approved):**
 
 ```
 ❌ I cannot implement this spec.
@@ -49,76 +57,138 @@ I only work with specs whose state means "Approved" (e.g. `Approved`, `Aprobado`
 or the equivalent in another language).
 
 To continue you have two options:
-  1. If the spec is ready, open it and change the state to "Approved"
-     (or your team's equivalent) manually. That change is made by the
-     human, not the agent.
-  2. If the spec still needs work, use /spec [name] to resume it.
+  1. If ready, open the spec and change the state to "Approved" (or your
+     team's equivalent) manually. That change is made by the human, not the agent.
+  2. If it still needs work, use /spec [name] to resume it.
 ```
 
-Do not offer alternatives or suggest starting anyway. The block is intentional.
+Don't offer to "start anyway". The block is intentional.
 
-### Phase 3 — Create the git branch and switch to it
+## Phase 2.5 — Staleness check
 
-0. If `git status --short` above shows uncommitted changes, **stop** and ask the user to commit or stash first. Never switch with a dirty working tree.
+Before touching git: derive the branch name `spec-NN-slug` (as in Phase 3). If that branch already exists (see spec-branches list above), compare `git log -1 --format=%cI -- specs/NN-slug.md` against `git log -1 --format=%cI spec-NN-slug`. If the spec file is newer than the branch's last commit, warn:
 
-1. Branch name = spec filename without extension, prefixed: `01-mvp-arkanoid.md` → `spec-01-mvp-arkanoid`.
+```
+⚠️ This spec was edited after the last commit on spec-NN-slug.
+The branch may be implementing an older version.
 
-2. Read `AutoCreateBranch` from the config above. Missing file, missing key, or unrecognized value → `true`. Only an explicit `false` (any capitalization) disables it.
+Continue anyway? [y/N] — or re-read the current spec first?
+```
 
-   - **`true` (default):** proceed without asking. Create the branch with `git checkout -b spec-NN-slug` if it doesn't exist; if it already exists, inform the user (previous work may be resumed) and `git checkout spec-NN-slug`. Confirm the switch succeeded before continuing.
-   - **`false`:** ask first:
+Wait for explicit confirmation. If no branch exists yet, skip silently.
 
-     ```
-     AutoCreateBranch is set to false.
-     Create and switch to the branch spec-NN-slug? [y/N]
-     ```
+## Phase 3 — Branch and switch
 
-     Yes → create/switch as above. No or empty → **do not touch git**; say you will implement on the current branch and wait for explicit confirmation to continue there.
+1. **Clean-tree check first.** From `git status --short`: if there are uncommitted changes, stop before any checkout:
 
-3. Confirm visually:
+   ```
+   ❌ Your working tree has uncommitted changes:
+
+   [paste short status]
+
+   Commit or stash them before I switch branches — a dirty switch would
+   carry these onto spec-NN-slug silently.
+   ```
+
+   Wait for the user to commit/stash and confirm, or to explicitly opt to carry them over. Don't decide for them.
+
+2. Branch name = spec file name without extension: `spec-NN-slug` (`01-mvp-arkanoid.md` → `spec-01-mvp-arkanoid`).
+
+3. Read `AutoCreateBranch` from the config above. Missing / unset / unrecognized → `true` (default). Only an explicit `false` (any capitalization) disables auto-creation.
+
+   **`true`:** proceed without asking. If the branch doesn't exist, `git checkout -b spec-NN-slug`. If it exists, tell the user (may mean resuming — see Phase 3.5). Either way, `git checkout spec-NN-slug` and confirm the switch succeeded.
+
+   **`false`:** ask first —
+
+   ```
+   AutoCreateBranch is set to false.
+   Create and switch to the branch spec-NN-slug? [y/N]
+   ```
+
+   Yes → create/switch as above. No/empty → don't create any branch; say you'll implement on the current branch and ask for explicit confirmation to continue there. Wait for the answer.
+
+4. Confirm:
 
    ```
    ✅ Ready to implement.
 
    Spec:   specs/NN-slug.md
-   Branch: spec-NN-slug  (active)   (← or the current branch, if none was created)
-   State:  Approved   (← echo the actual value found in the spec)
+   Branch: spec-NN-slug  (active)   (← or current branch, if none created)
+   State:  Approved   (← echo the actual value found)
    ```
 
-4. **Do not implement yet.** First show the spec summary: objective, scope, implementation plan (numbered steps), and acceptance criteria. Match section headings by meaning — the spec may be in any language.
+5. **Don't implement yet.** Show the spec summary, extracting via the section anchors (`<!-- section:header -->`, `scope`, `plan`, `acceptance`) rather than heading text — works in any language. Show objective, scope, implementation plan, acceptance criteria. If the spec predates anchors, fall back to matching headings by meaning and flag once that it's missing anchors.
 
-### Phase 4 — Implement step by step
+## Phase 3.5 — Resume detection (only if the branch already existed)
 
-After the summary, say:
+If Phase 3 found `spec-NN-slug` already existed: read the implementation-plan checkboxes in the spec file — the highest `- [x]` step is the last completed one (boxes are the source of truth, committed alongside each step's code). If any are ticked:
 
 ```
-I am going to implement the spec following the implementation plan exactly.
-I will pause after each step so you can review the diff.
-
-Shall we start with Step 1?
+This branch already has Step 1..N marked done.
+Resume from Step N+1?  [y/N]  — or review/redo an earlier step first?
 ```
 
-Wait for explicit confirmation. Then, for the whole implementation:
+Wait for confirmation; follow their lead if they want to redo (untick and re-run that step). If no boxes are ticked, proceed to Phase 4 at Step 1, noting briefly that none were done.
 
-**One rule above all:** implement what the spec says. If something looks suboptimal, note it as an observation but implement what was agreed. Changes to the spec go into the spec, not into the code by surprise.
+## Phase 4 — Implement step by step
 
-**Work rhythm per step:**
+After the summary (and Phase 3.5 if applicable):
 
-1. Implement the step.
-2. Summarize which files you touched and what you did, plus `git diff --stat`.
-3. Say: `Step N completed. Could you review the diff and let me know if I continue with Step N+1?` and wait.
-4. Once approved, offer to commit: `git add` the touched files, message `spec-NN: step N — short description`. If declined, continue without committing.
+```
+I'll implement the spec following the plan exactly, pausing after each step
+so you can review the diff.
 
-**On ambiguity the spec doesn't resolve:** stop, describe it exactly, present 2–3 concrete options, wait for the decision. Do not improvise.
+Shall we start with Step [1 or N+1]?
+```
 
-**On out-of-scope requests:** remind the user it's out of this spec's scope, suggest noting it for the next spec, do not implement it on this branch.
+Wait for explicit confirmation ("yes", "go", or equivalent). Then:
+
+**Above all:** implement what the spec says. If something looks suboptimal, note it as an observation but implement what was agreed. Spec changes go in the spec, not silently into code.
+
+**Rhythm per step:**
+1. Implement the step's code.
+2. Summarize files touched and what changed. Say: `Step N implemented. Review the diff — approve and I'll mark it done and commit.`
+3. **Wait for explicit approval.** Do not tick or commit before it.
+4. On approval: tick the step's checkbox in `specs/NN-slug.md` (`- [ ]` → `- [x]`).
+5. Commit the code **and** the ticked spec together, with `Step N` in the message (e.g. `Step 3: wire scoring to collision events`).
+6. Say `Step N done and committed. Continue with Step N+1?` and wait.
+
+**On unresolved ambiguity:** stop, describe it exactly, offer 2–3 concrete options, wait. Don't improvise.
+
+**On out-of-scope requests:** remind them it's out of scope, suggest noting it for the next spec, don't implement it here.
 
 **After the last step:**
 
 ```
-✅ All steps of the plan are implemented.
+✅ All plan steps implemented.
 
-Next step: verify the spec's acceptance criteria one by one.
-If they all pass, update the spec's state to "Implemented" (or your repo's
-equivalent) and make the final commit before merging this branch.
+Next: verify acceptance criteria one by one. If all pass, update the spec's
+state to "Implemented" (or your repo's equivalent) and make the final commit
+before merging this branch.
 ```
+
+---
+
+## Expected behavior
+
+```
+/spec-impl 01-mvp-arkanoid
+  P1    Finds specs/01-mvp-arkanoid.md
+  P2    Status (line 1 of blockquote) = "Approved" → ✅
+  P2.5  No existing branch → skip staleness
+  P3    Clean tree → checkout -b spec-01-mvp-arkanoid → switch; show summary via anchors
+  P3.5  New branch → nothing to resume
+  P4    Per step: implement → user reviews → approves → tick [x] → commit (code+tick)
+        → next; ends reminding to verify criteria
+
+/spec-impl 02-powerups  (state: Draft)
+  P2    "Draft" → ❌ error message; no branch, no code
+
+/spec-impl 01-mvp-arkanoid  (spec has Step 1-2 ticked [x])
+  P2.5  Spec unchanged since last branch commit → no warning
+  P3    Branch exists → switch (after clean-tree check)
+  P3.5  Reads checkboxes: Step 1,2 done → asks to resume from Step 3
+  P4    Continues from Step 3
+```
+
+Branch creation is controlled by `AutoCreateBranch` in `specs/.spec-config.yml` (default `true`; `false` makes Phase 3 ask `[y/N]`). Collisions and staleness are guarded by checking git branches for the spec number and comparing spec-file vs. branch commit dates (Phase 2.5 and `/spec` Phase 4).

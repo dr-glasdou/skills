@@ -29,6 +29,8 @@ Branch-creation config:
 
 Follow the phases in strict order. Do not advance if the previous phase didn't complete correctly.
 
+> **The single most important rule in this skill:** you implement **one step per turn** and then **STOP**. Read the "One-step gate" section below before Phase 4. Violating it is the worst failure mode this skill has — worse than a wrong branch, worse than a bad commit message. When in doubt about whether to continue, STOP.
+
 ## Phase 1 — Identify the spec
 
 Argument: `$ARGUMENTS`
@@ -79,10 +81,10 @@ Wait for explicit confirmation. If no branch exists yet, skip silently.
 
 ## Phase 3 — Branch and switch
 
-1. **Clean-tree check first.** From `git status --short`: if there are uncommitted changes, stop before any checkout:
+1. **Clean-tree check first.** From `git status --short`: if there are uncommitted or untracked changes, stop before any checkout:
 
    ```
-   ❌ Your working tree has uncommitted changes:
+   ❌ Your working tree has uncommitted or untracked changes:
 
    [paste short status]
 
@@ -130,28 +132,47 @@ Resume from Step N+1?  [y/N]  — or review/redo an earlier step first?
 
 Wait for confirmation; follow their lead if they want to redo (untick and re-run that step). If no boxes are ticked, proceed to Phase 4 at Step 1, noting briefly that none were done.
 
+**Reconcile boxes against reality before resuming.** If the git history shows a step was committed but its checkbox is still `[ ]` (or vice-versa), don't silently "fix" it by racing ahead. Point out the mismatch in one line, state which step you believe is actually next, and let the user confirm. A desynced checkbox is a signal to slow down, not to batch-correct.
+
+---
+
+## THE ONE-STEP GATE (read before Phase 4)
+
+This is a **hard rule**, not a stylistic preference. It has the same force as the Phase 2 state block.
+
+- **Implement exactly ONE step per turn, then STOP and wait for explicit approval.** Never begin step N+1 in the same turn you finished step N.
+- **Ambiguous "keep going" language authorizes ONE step, not the remainder.** Phrases like `continue`, `keep going`, `next`, `proceed`, `go`, or `commit and continue with next step` mean: *do the single next step, then pause.* They do **not** mean "run to the end of the plan."
+- **To batch multiple steps, the user must name an explicit range or count** — e.g. "do steps 6 through 9", "implement the next three steps", or "implement all remaining steps without pausing". Only an explicit range/count/"all" lifts the gate, and only for the steps named.
+- **When a message could mean "one step" or "several steps", it means one step.** Resolve every ambiguity toward stopping. A withheld step costs the user one "continue"; an unwanted five-step run costs them a review they never got and possibly a revert.
+- **Your own momentum is not a reason to continue.** Green builds, passing lint, and "it's all going smoothly" are never grounds to skip the pause. The pause exists precisely so the user can catch a divergence before it compounds across five steps.
+- **If you notice you are about to write code for a second step in one turn, that noticing is the signal to STOP** and hand control back, not a reason to keep going because you're "on a roll".
+
+If you ever find yourself reasoning "the user probably wants me to just keep going" — stop and re-read this section. That exact thought is the failure this gate prevents. Do the one step and let them tell you to continue.
+
 ## Phase 4 — Implement step by step
 
 After the summary (and Phase 3.5 if applicable):
 
 ```
-I'll implement the spec following the plan exactly, pausing after each step
-so you can review the diff.
+I'll implement the spec following the plan exactly, ONE step at a time,
+pausing after each so you can review the diff.
 
 Shall we start with Step [1 or N+1]?
 ```
 
-Wait for explicit confirmation ("yes", "go", or equivalent). Then:
+Wait for explicit confirmation ("yes", "go", or equivalent). Then implement **one** step:
 
 **Above all:** implement what the spec says. If something looks suboptimal, note it as an observation but implement what was agreed. Spec changes go in the spec, not silently into code.
 
-**Rhythm per step:**
-1. Implement the step's code.
+**Rhythm per step (one full turn each):**
+1. Implement **only this one step's** code.
 2. Summarize files touched and what changed. Say: `Step N implemented. Review the diff — approve and I'll mark it done and commit.`
-3. **Wait for explicit approval.** Do not tick or commit before it.
+3. **STOP. Wait for explicit approval.** Do not tick, do not commit, do not start step N+1. End your turn here.
 4. On approval: tick the step's checkbox in `specs/NN-slug.md` (`- [ ]` → `- [x]`).
 5. Commit the code **and** the ticked spec together, with `Step N` in the message (e.g. `feat(spec-nn): Step 3 - wire scoring to collision events`).
-6. Say `Step N done and committed. Continue with Step N+1?` and wait.
+6. Say `Step N done and committed. Continue with Step N+1?` and **STOP again**. Wait.
+
+Each numbered rhythm above spans its own turn. Steps 1–3 are one turn (implement + pause). Steps 4–6 are the next turn (after approval: tick + commit + pause). You never chain from step N's commit straight into step N+1's implementation.
 
 **On unresolved ambiguity:** stop, describe it exactly, offer 2–3 concrete options, wait. Don't improvise.
 
@@ -169,6 +190,28 @@ before merging this branch.
 
 ---
 
+## Git safety rules
+
+These bind every turn, including undo/rollback requests.
+
+- **Never run a destructive git command on work you did not create this session without an explicit, specific instruction and a safety net.** Destructive = `git reset --hard`, `git clean -f[dx]`, `git checkout -- <path>` that discards edits, force-push, branch deletion.
+- **`git clean` is especially dangerous** because it deletes *untracked* files — which routinely includes the user's own in-progress work that was never committed. Before any `git clean`, run `git status --short`, and if untracked files exist that you did not create this turn, **do not clean them** — stop and confirm each, or stash instead.
+- **"Undo what you did" / "discard it" means undo *your* session's changes, not wipe the tree.** Distinguish (a) commits you made this session, (b) edits you made to already-tracked files, and (c) files/edits that existed *before* you started. Only (a) and (b) are yours to reverse. Never destroy (c).
+- **Prefer reversible undo.** To roll back your commits, prefer `git revert` or a soft/mixed reset that preserves the working tree, over `--hard`. If a `--hard` reset is genuinely warranted, first capture a safety ref: `git branch backup/pre-undo-$(date +%s)` or `git stash`, and tell the user the ref name so nothing is truly lost.
+- **When unsure what "undo" should encompass, ask before acting.** Show the user the commits and changes you're about to reverse and confirm the scope. A one-line confirmation is cheap; a destroyed uncommitted file recovered only by luck of the reflog is not.
+- **After any rollback, run `git status --short` and `git log --oneline -3` and report the resulting state** so the user can verify the tree matches their expectation.
+
+---
+
+## Hard rules
+
+- **One step per turn — see THE ONE-STEP GATE.** "Continue" authorizes one step; only an explicit range/count/"all" batches.
+- Never issue a warning about state unless Phase 2 detected a non-Approved state; that block is intentional and non-negotiable.
+- Never tick a checkbox or commit before the user has explicitly approved that step's diff.
+- Never run destructive git commands on pre-existing or untracked user work — see Git safety rules.
+- Never improvise past unresolved ambiguity — stop and offer options.
+- Never implement out-of-scope requests on this branch — defer to the next spec.
+
 ## Expected behavior
 
 ```
@@ -178,8 +221,8 @@ before merging this branch.
   P2.5  No existing branch → skip staleness
   P3    Clean tree → checkout -b spec-01-mvp-arkanoid → switch; show summary via anchors
   P3.5  New branch → nothing to resume
-  P4    Per step: implement → user reviews → approves → tick [x] → commit (code+tick)
-        → next; ends reminding to verify criteria
+  P4    ONE step per turn: implement → STOP → user approves → tick [x] → commit → STOP
+        → wait; repeat; ends reminding to verify criteria
 
 /spec-impl 02-powerups  (state: Draft)
   P2    "Draft" → ❌ error message; no branch, no code
@@ -188,7 +231,21 @@ before merging this branch.
   P2.5  Spec unchanged since last branch commit → no warning
   P3    Branch exists → switch (after clean-tree check)
   P3.5  Reads checkboxes: Step 1,2 done → asks to resume from Step 3
-  P4    Continues from Step 3
+  P4    Implements Step 3 only → STOP → waits
+
+User: "commit and continue with next step"  (on step N)
+  → Commit the pending step, implement step N+1 ONLY, then STOP.
+    This phrase does NOT authorize steps N+2 onward.
+
+User: "implement steps 6 through 9"
+  → Explicit range → the gate is lifted for 6–9. Still commit each and
+    show diffs, but you may proceed through the named range without
+    re-asking between each. Stop at 9.
+
+User: "undo all of what you did" / "discard it"
+  → Reverse only THIS session's commits and edits. Capture a backup ref
+    first. Never git clean untracked pre-existing work. Confirm scope if
+    unsure. Report git status + log afterward.
 ```
 
 Branch creation is controlled by `AutoCreateBranch` in `specs/.spec-config.yml` (default `true`; `false` makes Phase 3 ask `[y/N]`). Collisions and staleness are guarded by checking git branches for the spec number and comparing spec-file vs. branch commit dates (Phase 2.5 and `/spec` Phase 4).

@@ -16,6 +16,10 @@ Read `template.md` (same directory) for the exact structure, including the `<!--
 
 Reply in the same language as the initial prompt. The anchor comments stay in English — they're machine markers.
 
+> **Two hard gates govern this flow, both non-negotiable:**
+> 1. **You never write code** — the only artifact you produce is the `.md` at the end.
+> 2. **You develop ONE section per turn, show it, and STOP for confirmation** before the next. Never emit the whole spec in one response. See "THE ONE-SECTION GATE" below.
+
 ## Phase 1 — Context
 
 1. Read the first project-memory file that exists, in order: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `README.md`.
@@ -37,11 +41,23 @@ Phrasing:
 
 Stop asking once you can answer, with no assumptions: (1) which files appear or change, (2) first and last executable step, (3) how to verify it's done. If you can't answer one, keep asking.
 
+## THE ONE-SECTION GATE (read before Phase 3)
+
+This is a **hard rule** with the same force as "never write code".
+
+- **Develop exactly ONE section per turn.** Write it, show it in markdown, ask whether it stays or needs tweaking, then **STOP** and wait. Do not draft section 2 in the same turn you drafted section 1.
+- **Never emit the full spec, or several sections, in one response** — not even if the feature seems simple, not even if you "already know" all the answers, not even if the user says "continue".
+- **Ambiguous "keep going" language authorizes ONE section, not the rest.** `continue`, `next`, `go`, `keep going` mean: *do the single next section, then pause.* To produce multiple sections at once the user must explicitly say so (e.g. "draft the remaining sections in one go") — and even then, prefer to confirm the header and scope individually since everything downstream depends on them.
+- **When a phrase could mean "one section" or "several", it means one.** Resolve toward stopping.
+- Re-show and re-confirm after each tweak until the user confirms the section, then move to the next.
+
+If you catch yourself about to write a second section because the flow feels smooth, that impulse is the signal to STOP and hand control back.
+
 ## Phase 3 — Build section by section
 
-Never generate the full spec at once. Develop each section, show it, wait for confirmation, then move on. After each: show it in markdown, ask "Does this stay or do you want to tweak it?", apply changes and re-show until confirmed.
+Never generate the full spec at once. Develop each section per the One-Section Gate: show it, wait for confirmation, then move on. After each: show it in markdown, ask "Does this stay or do you want to tweak it?", apply changes and re-show until confirmed.
 
-Order:
+Order (one per turn):
 1. **Header** — state, dependencies, date, one-sentence objective. `Status:` must be the **first line** of the blockquote (positional anchor `/spec-impl` relies on). If the objective needs two sentences, return to Phase 2.
 2. **Scope** — in *and* explicitly not-in.
 3. **Data model** — real names. If no new data, say so explicitly and skip.
@@ -77,10 +93,10 @@ Avoid: unverifiable criteria ("works well"), plan items outside scope, unconfirm
 ## Hard rules
 
 - Never write code here — only the `.md` at the end.
+- Never generate the full spec, or multiple sections, in one response — see THE ONE-SECTION GATE. "Continue" authorizes one section.
 - Never propose implementing after saving. Your job ends at the written file.
 - Never assume unconfirmed decisions — ask.
-- Never generate the full spec in one response.
-- If the user wants to skip Phase 2: "Questions now save hours later. Are you sure?" If they insist, respect it but record it under Decisions ("Quick definition without detailed clarification").
+- If the user wants to skip Phase 2: warn once — "Questions now save hours later. Are you sure?" If they still insist, respect it, but (a) record it under Decisions as "Quick definition without detailed clarification", and (b) the One-Section Gate still applies — skipping questions does not license emitting the whole spec at once.
 - If the feature is too big (won't fit one sentence, touches >3 system areas, or needs decisions in ≥4 domains), propose splitting before continuing.
 
 ## Tone

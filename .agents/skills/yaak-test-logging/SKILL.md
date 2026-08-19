@@ -13,11 +13,14 @@ so test history is auditable.
 - One file per exchange. Filename: `<ISO8601-timestamp>-<sanitized-endpoint>.json`
   (e.g. `2026-08-06T15-30-00Z-health-db.json`). Sanitize: lowercase, slashes → `-`,
   strip query string, drop leading `/api/v1`.
-- File contents — a single JSON object:
+- File contents — a single JSON object. **Parse the response body as JSON and embed
+  it raw** (not as an escaped string) whenever the response `content-type` is JSON.
+  If the body is not valid JSON (e.g. HTML, plain text), keep it as a string.
+  Do the same for the request body.
 ```json
   {
     "request":  { "method": "GET", "url": "...", "headers": {}, "body": null },
-    "response": { "status": 200, "headers": {}, "body": "..." },
+    "response": { "status": 200, "headers": {}, "body": { "id": "...", "details": [] } },
     "yaak":     { "requestId": "...", "folderId": "..." }
   }
 ```

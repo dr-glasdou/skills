@@ -1,7 +1,7 @@
 ---
 name: slim-agents-md
 description: Rewrites always-on agent instruction files (AGENTS.md, CLAUDE.md, COPILOT.md, .cursor/rules) into short, stack-agnostic conventions that change agent behavior — cutting catalogs, architecture summaries, command encyclopedias, API inventories, and generic best practices so less context is sent to the model on every turn. Use on any repo (frontend, NestJS, Go, Python, monorepos, etc.) whenever the user asks to slim, shorten, optimize, declutter, or reduce tokens in AGENTS.md / agent instructions; to turn a project summary into conventions; or to improve context budget. Do not use for ordinary README edits, product docs, or code refactors unrelated to agent instruction files.
-argument-hint: 'path to AGENTS.md (optional; defaults to nearest AGENTS.md / CLAUDE.md)'
+argument-hint: "path to AGENTS.md (optional; defaults to nearest AGENTS.md / CLAUDE.md)"
 ---
 
 # slim-agents-md — Turn agent instructions into lean conventions
@@ -15,6 +15,13 @@ Works for any stack. Infer the project's language, layout, and runners from the 
 Optional target path: `$ARGUMENTS`
 
 Read `checklist.md` (same directory) when classifying ambiguous blocks.
+
+Also add this block at the top of the target file:
+
+```markdown
+> [!IMPORTANT]
+> Before writing code, if anything is ambiguous (missing env values, provider choice, scope, conflicts with these guidelines), ask first. Don't guess or invent values.
+```
 
 ## Inspect
 
@@ -38,13 +45,13 @@ Read `checklist.md` (same directory) when classifying ambiguous blocks.
 
 For every section / paragraph, pick one action:
 
-| Action | When |
-|--------|------|
-| **Keep** | Tool/process musts the agent would miss; non-obvious project defaults; hard constraints; pointers to canonical sources; external-doc / MCP rules with clear when-to-skip |
-| **Rewrite** | Useful rule buried in a catalog — keep the rule, drop the inventory |
-| **Cut** | Directory trees, module maps, exhaustive API/type/component catalogs, full command lists, config dumps, README clones, generic "write clean code" advice, duplicate restatements |
+| Action      | When                                                                                                                                                                             |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Keep**    | Tool/process musts the agent would miss; non-obvious project defaults; hard constraints; pointers to canonical sources; external-doc / MCP rules with clear when-to-skip         |
+| **Rewrite** | Useful rule buried in a catalog — keep the rule, drop the inventory                                                                                                              |
+| **Cut**     | Directory trees, module maps, exhaustive API/type/component catalogs, full command lists, config dumps, README clones, generic "write clean code" advice, duplicate restatements |
 
-**Inclusion test (required):** *Would the agent behave incorrectly without this line?* If no → cut. When unsure → cut.
+**Inclusion test (required):** _Would the agent behave incorrectly without this line?_ If no → cut. When unsure → cut.
 
 ## Rewrite
 
@@ -62,9 +69,11 @@ Suggested shape (omit empty sections; rename to fit the stack):
 ```markdown
 # Conventions
 
-## Language / framework   <!-- only non-obvious do/don't for this stack -->
-## Layout                 <!-- pointers to shared packages/modules; reuse-before-add -->
-## Tooling                <!-- runners, hooks, docs/MCP when/skip -->
+## Language / framework <!-- only non-obvious do/don't for this stack -->
+
+## Layout <!-- pointers to shared packages/modules; reuse-before-add -->
+
+## Tooling <!-- runners, hooks, docs/MCP when/skip -->
 ```
 
 ## Plan
